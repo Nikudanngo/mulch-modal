@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 def tokenize(text):
     """形態素解析を行い、トークンのリストを返す。"""
@@ -82,8 +83,16 @@ def evaluate_clustering(clusters, true_labels):
         true_labels_in_cluster = np.array(true_labels)[mask]
         indices_in_cluster = np.where(mask)[0]
         print(f"Cluster {cluster_num}:")
-        print(f"  True labels and indices: {list(zip(indices_in_cluster, true_labels_in_cluster))}")
+        print(f"  True indices and labels: {list(zip(indices_in_cluster, true_labels_in_cluster))}")
         print(f"  Predicted labels: {cluster_labels[mask]}")
+        
+        precision = precision_score(true_labels_in_cluster, cluster_labels[mask], average='macro', zero_division=0)
+        recall = recall_score(true_labels_in_cluster, cluster_labels[mask], average='macro', zero_division=0)
+        f1 = f1_score(true_labels_in_cluster, cluster_labels[mask], average='macro', zero_division=0)
+        
+        print(f"  Precision: {precision:.2f}")
+        print(f"  Recall: {recall:.2f}")
+        print(f"  F1 Score: {f1:.2f}")
     
     return accuracy
 
