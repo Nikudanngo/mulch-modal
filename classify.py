@@ -16,13 +16,15 @@ def load_abstracts_from_csv(file_path):
     """CSVファイルからデータを読み込み、アブストラクトとラベルのリストを返す。"""
     abstracts = []
     labels = []
+    indices = []
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             reader = csv.reader(file)
             for row in reader:
                 labels.append(int(row[0]))
                 abstracts.append(row[1])
-        return abstracts, labels
+                indices.append(reader.line_num)
+        return abstracts, labels, indices
     except Exception as e:
         raise RuntimeError(f"ファイルの読み込み中にエラーが発生しました: {e}")
 
@@ -55,7 +57,7 @@ def cluster_and_visualize(X_pca, abstracts, n_clusters=4):
     scatter = plt.scatter(X_pca[:, 0], X_pca[:, 1], c=clusters, cmap='viridis')
     plt.xlabel('PC1')
     plt.ylabel('PC2')
-    plt.title('クラスタリング結果')
+    plt.title('Clustering Result')
     
     for i, text in enumerate(abstracts):
         plt.annotate(str(i), (X_pca[i, 0], X_pca[i, 1]))
@@ -65,44 +67,53 @@ def cluster_and_visualize(X_pca, abstracts, n_clusters=4):
 
     return clusters
 
-def evaluate_clustering(clusters, true_labels):
+def evaluate_clustering(clusters, labels):
     """クラスタリングの結果を評価する。"""
+    n_clusters = len(np.unique(clusters))
     cluster_labels = np.zeros_like(clusters)
-    for i in range(4):
+    input_labels = np.array(labels)
+    f1_score_list = []
+    
+    print(f"Number of clusters: {n_clusters}")
+    print(input_labels)
+    
+    # 各クラスタ(0~3)ごとに順番にラベルを割り当てる
+    for i in range(n_clusters):
         mask = (clusters == i)
-        true_labels_in_cluster = np.array(true_labels)[mask]
-        if len(true_labels_in_cluster) > 0:
-            most_common_label = np.bincount(true_labels_in_cluster).argmax()
+        labels_in_cluster = np.array(labels)[mask]
+        if len(labels_in_cluster) > 0:
+            most_common_label = np.bincount(labels_in_cluster).argmax()
             cluster_labels[mask] = most_common_label
     
-    accuracy = np.sum(cluster_labels == true_labels) / len(true_labels)
+    print(cluster_labels)
+    
+    # クラスタリングの精度を計算
+    accuracy = np.sum(cluster_labels == labels) / len(labels)
     print(f"Clustering accuracy: {accuracy * 100:.2f}%")
     
-    for cluster_num in range(4):
-        mask = (clusters == cluster_num)
-        true_labels_in_cluster = np.array(true_labels)[mask]
-        indices_in_cluster = np.where(mask)[0]
-        print(f"Cluster {cluster_num}:")
-        print(f"  True indices and labels: {list(zip(indices_in_cluster, true_labels_in_cluster))}")
-        print(f"  Predicted labels: {cluster_labels[mask]}")
-        
-        precision = precision_score(true_labels_in_cluster, cluster_labels[mask], average='macro', zero_division=0)
-        recall = recall_score(true_labels_in_cluster, cluster_labels[mask], average='macro', zero_division=0)
-        f1 = f1_score(true_labels_in_cluster, cluster_labels[mask], average='macro', zero_division=0)
-        
-        print(f"  Precision: {precision:.2f}")
-        print(f"  Recall: {recall:.2f}")
-        print(f"  F1 Score: {f1:.2f}")
-    
+    # # 各クラスタ(0~3)の適合率、再現率、F1スコアを計算
+    for i in range(n_clusters):
+        precision = precision_score(input_labels, cluster_labels, labels=[i+1], average='micro')
+        recall = recall_score(input_labels, cluster_labels, labels=[i+1], average='micro')
+        f1 = f1_score(input_labels, cluster_labels, labels=[i+1], average='micro')
+        f1_score_list.append(f1)
+        print(f"Cluster {i+1} precision: {precision * 100:.2f}%")
+        print(f"Cluster {i+1} recall: {recall * 100:.2f}%")
+        print(f"Cluster {i+1} F1 score: {f1 * 100:.2f}%")
+
+    print(f"Average F1 score: {np.mean(f1_score_list) * 100:.2f}%")
+
     return accuracy
 
+
 def main(file_path):
-    abstracts, true_labels = load_abstracts_from_csv(file_path)
+    abstracts, labels, indices = load_abstracts_from_csv(file_path)
+
     check_abstracts(abstracts)
     X_pca = extract_features(abstracts)
     clusters = cluster_and_visualize(X_pca, abstracts)
 
-    evaluate_clustering(clusters, true_labels)
+    evaluate_clustering(clusters, labels)
 
 # データの読み込み（例としてのファイルパス）
 file_path = 'abstracts.csv'
